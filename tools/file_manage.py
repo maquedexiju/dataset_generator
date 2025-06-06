@@ -1,0 +1,99 @@
+import os
+import importlib
+from file_parsers.basic_parser import BasicParser
+import re
+
+def gen_doc_tree(dir_path):
+    """
+    生成目录树
+    """
+    root_name = dir_path.split('/')[-1]
+    root_path = dir_path.split(root_name)[0]
+    tree = {
+        root_name: {
+            'dir_path': dir_path, 'children': {}, 'files': {}
+        }
+    }
+    sep = os.path.sep
+
+    for root, dirs, files in os.walk(dir_path):
+        # root 去掉 root_path
+        root = root.replace(root_path, '')
+
+        cur_node = tree[root_name]
+        for p in root.split(sep)[1:]:
+            cur_node = cur_node['children'][p]
+
+        # 把 dirs 转为 dict
+        for d in dirs:
+            cur_node['children'][d] = {
+                'dir_path': os.path.join(dir_path, root, d), 'children': {}, 'files': {}
+            }
+        
+        # 把 files 转为 dict
+        for f in files:
+            cur_node['files'][f] = {
+                'dir_path': os.path.join(dir_path, root, f)
+            }
+    
+    return tree
+
+
+class Parser_Chooser:
+
+    def __init__(self, config):
+        # self.parser = {}
+        # for k, v in config['PARSER'].items():
+        #     lib_name = 'file_parsers.' + v
+        #     self.parser[k] = importlib.import_module(v)
+        # 获取 file_parsers 目录下的所有文件
+        self.parser = {
+            'reg': {},
+            'suffix': {},
+        }
+        for file in os.listdir('file_parsers'):
+            if file.endswith('.py') and not file.startswith('__'):
+                lib_name = 'file_parsers.' + file.split('.')[0]
+                # 获取 lib_name 下所有 BaseParser 的子类
+                for name, obj in importlib.import_module(lib_name).__dict__.items():
+                    if isinstance(obj, type) and issubclass(obj, BasicParser) and obj is not BasicParser:
+                        # 如果 suffix 在 obj 中
+                        if hasattr(obj, 'suffix'):
+                            self.parser['suffix'][obj.suffix] = obj
+                        if hasattr(obj,'reg'):
+                            self.parser['reg'][obj.reg] = obj
+        
+        self.path_ignore = self.read_path_ignore(config['GENERAL']['path_ignore'])
+
+        
+    def choose_parser(self, file_path):
+
+        # 根据 path_ignore 过滤
+        for p in self.path_ignore:
+            if re.search(p, file_path):
+                return 'ignored'
+
+        # 根据 reg 匹配
+        for reg, parser in self.parser['reg'].items():
+            if re.search(reg, file_path):
+                return parser
+
+        # 根据 suffix 匹配
+        file_ext = file_path.split('.')[-1].lower()
+        if file_ext in self.parser['suffix'].keys():
+            return self.parser['suffix'][file_ext]
+
+        # 如果都没有匹配到，返回 None
+        return None
+
+
+    def read_path_ignore(self, path_ignore_file):
+        """
+        读取 path_ignore_file 文件，返回一个列表
+        """
+        if not os.path.exists(path_ignore_file):
+            return []
+
+        with open(path_ignore_file, 'r') as f:
+            lines = f.readlines()
+            return [x.strip() for x in lines if not x.strip().startswith(('#', ';', '//'))]

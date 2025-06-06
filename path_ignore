@@ -1,0 +1,3 @@
+# 需要忽略的 path，
+*/assets/*
+.DS_Store
