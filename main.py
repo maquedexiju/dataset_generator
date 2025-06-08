@@ -54,20 +54,30 @@ if __name__ == '__main__':
     elif len(args) >= 2:
         root_dir = ' '.join(args[1:])
 
-    parser_chooser = file_manage.Parser_Chooser(config_dict)
-    qa_manager = qa_manage.QA_Manager(config_dict)
+    if not os.path.exists(root_dir):
+        print(f'文件路径不存在: {root_dir}')
+        exit(1)
+    
+    parent_path, file_name = os.path.split(root_dir)
+    knowledge_base_dir = os.path.join(parent_path, f'{file_name}_kb')
+    if not os.path.exists(knowledge_base_dir):
+        os.makedirs(knowledge_base_dir)
+
+
+    parser_chooser = file_manage.Parser_Chooser(config_dict, logger)
+    qa_manager = qa_manage.QA_Manager(config_dict, root_dir)
 
     for dir, children, files in os.walk(root_dir):
         for file in files:
             file_path = os.path.join(dir, file)
             parser_class = parser_chooser.choose_parser(file_path)
-            if parser_class is not None:
-                parser = parser_class(file_path, root_dir, config_dict, title_prefix='%parent', logger=logger)
-                result = parser.parse()
-                qa_manager.merge_qa(result)
-            elif parser_class is 'ignored':
+            if parser_class == 'ignored':
                 logger.info('======')
                 logger.info(f'file {file_path} ignored')
+            elif parser_class is not None:
+                parser = parser_class(file_path, root_dir, config_dict, title_prefix='%parent', logger=logger, output_dir=knowledge_base_dir)
+                result = parser.parse()
+                qa_manager.merge_qa(result, file_path)
             else:
                 logger.warning('======')
                 logger.warning(f'no parser for {file_path}')

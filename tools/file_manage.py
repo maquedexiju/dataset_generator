@@ -41,7 +41,7 @@ def gen_doc_tree(dir_path):
 
 class Parser_Chooser:
 
-    def __init__(self, config):
+    def __init__(self, config, logger):
         # self.parser = {}
         # for k, v in config['PARSER'].items():
         #     lib_name = 'file_parsers.' + v
@@ -59,9 +59,20 @@ class Parser_Chooser:
                     if isinstance(obj, type) and issubclass(obj, BasicParser) and obj is not BasicParser:
                         # 如果 suffix 在 obj 中
                         if hasattr(obj, 'suffix'):
+                            # self.parser['suffix'][obj.suffix] = obj
+                            if type(obj.suffix) is str:
+                                if obj.suffix in self.parser['suffix'].keys():
+                                    self.logger.warning(f'后缀 {obj.suffix} 已有处理器 {self.parser['suffix'][obj.suffix].__name__}， {obj.__name__} 会被忽略')
+                                else:
+                                    self.parser['suffix'][obj.suffix] = obj
+                            elif type(obj.suffix) is list:
+                                for r in obj.suffix:
+                                    if r in self.parser['suffix'].keys():
+                                        self.logger.warning(f'后缀 {r} 已有处理器 {self.parser['suffix'][r].__name__}， {obj.__name__} 会被忽略')
+                                    else:
+                                        self.parser['suffix'][r] = obj
+                        if hasattr(obj,'suffix'):
                             self.parser['suffix'][obj.suffix] = obj
-                        if hasattr(obj,'reg'):
-                            self.parser['reg'][obj.reg] = obj
         
         self.path_ignore = self.read_path_ignore(config['GENERAL']['path_ignore'])
 

@@ -5,7 +5,7 @@ class BasicParser:
     # suffix = 'txt'
     # reg = '.*\.txt$'
 
-    def __init__(self, file_path, root_path, cfg, title_prefix='%parent', logger=None, output_path='./output'):
+    def __init__(self, file_path, root_path, cfg, title_prefix='%parent', logger=None, output_dir='./output'):
         '''
         初始化解析器
         :param file_path: 完整的文件路径
@@ -22,7 +22,7 @@ class BasicParser:
         knowledge_path = os.path.relpath(file_path, root_path)
         # self.knowledge_path = knowledge_path.replace(os.path.sep, '-')
         self.knowledge_path = knowledge_path
-        self.output_path = os.path.join(output_path, self.knowledge_path)
+        self.output_dir = os.path.join(output_dir, self.knowledge_path)
 
         # 获取文件的基本名称（不包含扩展名）
         file_fullname = file_path.split('/')[-1]
@@ -67,7 +67,7 @@ class BasicParser:
         self.qa_info.append({
             'simple_title': '',
             'full_title': '',
-            'content': 'content1\n@section: position' + '\n\n====\n', # @resource: 用来标记资源，@section 用来标记一段内容（同一来源）
+            'content': self.add_tag('content', 'section', 'position'), # @resource: 用来标记资源，@section 用来标记一段内容（同一来源）
             # 'other key'
         })
 
@@ -82,8 +82,25 @@ class BasicParser:
         :return:
         '''
 
-        return f'\n@{tag_name}: {tag_desc}\n\n{content}\n@end{tag_name}\n'
+        return f'\n@{tag_name}: {self.knowledge_path}: {tag_desc}\n\n{content}\n@end{tag_name}\n'
+    
 
+    def add_resource_tag(self, content, resource_path_in_file):
+        '''
+        给 content 添加 @resource 标签
+        :param content: 内容
+        :param resource_path: 资源路径
+        '''
+        return self.add_tag(content, 'resource', f'{self.knowledge_path}: {resource_path_in_file}')
+
+
+    def add_section_tag(self, content, section_path_in_file):
+        '''
+        给 content 添加 @section 标签
+        :param content: 内容
+        :param section_path: 资源路径
+        '''
+        return self.add_tag(content,'section', f'{self.knowledge_path}: {section_path_in_file}')
     
     def __del__(self):
         self.temp_dir.cleanup()

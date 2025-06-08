@@ -16,7 +16,8 @@ img_parse_prompt = '''
 '''
 
 class MDParser(BasicParser):
-    reg = '(?:.*\.md$|.*\.markdown$)'
+    # reg = r'(?:.*\.md|.*\.markdown)$'
+    suffix = ['md', 'markdown']
 
     def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None):
         # 检查文件类型
@@ -150,18 +151,27 @@ class MDParser(BasicParser):
         current_content = []
 
         # 创建图片输出目录
-        self.image_output_dir = os.path.join(self.output_path, 'images')
+        self.image_output_dir = os.path.join(self.output_dir, 'images')
         if not os.path.exists(self.image_output_dir):
             os.makedirs(self.image_output_dir)
 
         # 按行遍历 Markdown 内容
+        is_in_code = False
         for line in self.md_content.splitlines():
-            if line.startswith('#'):
+            # 处理代码
+            if line.startswith('```'):
+                is_in_code = not is_in_code
+                continue
+            if is_in_code:
+                current_content.append(line)
+                continue
+
+            # 处理标题
+            if line.startswith('#') and not is_in_code:
                 # 处理当前标题内容
                 if current_header_path and current_content and ''.join(current_content) != '':
-                    position = f'{self.knowledge_path}: {"-".join(headers)}'
-                    result[current_header_path] = self.add_tag('\n'.join(current_content).strip(), 'section', position)
-                    # result[current_header_path] = f'\n@section: {position}\n\n' + '\n'.join(current_content).strip() + '\n@endsection\n'
+                    position = "-".join(headers)
+                    result[current_header_path] = self.add_section_tag('\n'.join(current_content).strip(), position)
                     current_content = []
 
                 # 解析新标题级别和文本
@@ -194,8 +204,8 @@ class MDParser(BasicParser):
 
         # 处理最后一个标题内容
         if current_header_path and current_content:
-            position = f'{self.knowledge_path}: {"-".join(headers)}'
-            result[current_header_path] = self.add_tag('\n'.join(current_content).strip(), 'section', position)
+            position = "-".join(headers)
+            result[current_header_path] = self.add_section_tag('\n'.join(current_content).strip(), position)
 
         self.content_dict = result
         

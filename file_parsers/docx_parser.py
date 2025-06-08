@@ -97,7 +97,7 @@ class DOCXParser(BasicParser):
         markdown_lines = []
         
         # 创建图片输出目录
-        image_output_dir = os.path.join(self.output_path, 'images')
+        image_output_dir = os.path.join(self.output_dir, 'images')
         if not os.path.exists(image_output_dir):
             os.makedirs(image_output_dir)
 
@@ -123,7 +123,7 @@ class DOCXParser(BasicParser):
         # 写入 Markdown 文件
         md_content = '\n'.join(markdown_lines)
         self.md_content = md_content
-        output_md_path = os.path.join(self.output_path, 'output.md')
+        output_md_path = os.path.join(self.output_dir, 'output.md')
         with open(output_md_path, 'w', encoding='utf-8') as f:
             f.write(md_content)
         return md_content
@@ -264,7 +264,6 @@ class DOCXParser(BasicParser):
         # 处理最后一个标题内容
         if current_header_path and current_content:
             position = f'{self.knowledge_path}: {"-".join(headers)}'
-            result[current_header_path] = '\n'.join(current_content).strip() + f'\n@section: {position}\n\n====\n'
             result[current_header_path] = f'\n@section: {position}\n\n' + '\n'.join(current_content).strip() + '\n@endsection\n'
 
         self.content_dict = result
