@@ -9,6 +9,9 @@ from openai import OpenAI
 
 from .basic_parser import BasicParser
 
+if sys.platform.startswith('win'):
+    import comtypes.client
+
 ppt_parse_prompt_v1 = '''
 你是一个图像识别助手，识别图片中的 PPt 内容，包括页面类型、标题、内容、图表等，并返回 json。
 页面类型包括：标题、目录、内容、其他。
@@ -79,16 +82,69 @@ class PPTXParserViaPDF(BasicParser):
 
         super().__init__(file_path, root_path, cfg, title_prefix, logger, output_dir)
 
+
+    def copy_ppt_with_format(self, src_presentation, output_ppt_path):
+
+        """带格式复制PPT到临时文件"""
+        powerpoint = comtypes.client.CreateObject("Powerpoint.Application")
+        powerpoint.Visible = 1  # 必须可见才能执行格式复制
+        
+        try:
+            # 打开源文件
+            # src_presentation = powerpoint.Presentations.Open(os.path.abspath(input_ppt_path))
+            
+            # 创建新演示文稿
+            dest_presentation = powerpoint.Presentations.Add()
+            
+            # 复制每一页并保留格式
+            for i in range(1, src_presentation.Slides.Count + 1):
+                src_slide = src_presentation.Slides(i)
+                src_slide.Copy()
+                
+                # 使用PasteSpecial确保格式保留
+                dest_presentation.Slides.Paste()  # 粘贴到新PPT
+                # dest_presentation.Windows(1).View.PasteSpecial(DataType=1)  # 2 = ppPasteDefault
+                # dest_presentation.CommandBars.ExecuteMso("PasteSourceFormatting")
+                
+                # 添加延迟确保复制完成
+                time.sleep(0.5)
+            
+            # 保存新文件
+            dest_presentation.SaveAs(os.path.abspath(output_ppt_path))
+            print(f"已带格式保存临时PPT到: {output_ppt_path}")
+            return dest_presentation
+            
+        except Exception as e:
+            print(f"复制过程中出错: {str(e)}")
+        finally:
+            pass
+            # 确保关闭所有文档
+            # if 'src_presentation' in locals():
+            #     src_presentation.Close()
+            # if 'dest_presentation' in locals():
+            #     dest_presentation.Close()
+            # powerpoint.Quit()
     
+
     def ppt_to_pdf(self, pdf_file_path, tmp_dir):
 
         if sys.platform.startswith('win'):
-            import win32com.client
 
-            ppt = win32com.client.Dispatch('PowerPoint.Application')
-            ppt.Presentations.Open(self.file_path)
-            ppt.ActivePresentation.SaveAs(pdf_file_path, 32)  # 32 表示保存为 PDF
-            ppt.Quit()
+            powerpoint = comtypes.client.CreateObject("Powerpoint.Application")
+            powerpoint.Visible = 1
+            
+            ppt = powerpoint.Presentations.Open(self.file_path, ReadOnly=False)
+            try:
+                ppt.SaveAs(pdf_file_path, 32)  # 32表示PDF格式
+            except Exception as e:
+                tmp_ppt = self._copy_ppt_with_format(ppt, 'tmp.pptx')
+                tmp_ppt.SaveAs(pdf_file_path, 32)
+                tmp_ppt.Close()
+
+                os.remove('tmp.pptx')
+            
+            ppt.Close()
+            powerpoint.Quit()
 
         ## 如果是 linux，使用 libreoffice 库
         elif sys.platform.startswith('linux') or sys.platform.startswith('linux'):
@@ -190,7 +246,7 @@ class PPTXParserViaPDF(BasicParser):
     def parse(self):
 
         # 生成临时文件夹
-        tmp_dir = self.temp_dir.name
+        tmp_dir = self.temp_dir
         
         file_basename = os.path.basename(self.file_path)
         file_rootname = os.path.splitext(file_basename)[0]

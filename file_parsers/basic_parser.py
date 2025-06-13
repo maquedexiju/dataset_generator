@@ -63,7 +63,8 @@ class BasicParser:
 
         # 创建 temp_dir
         dir_prefix = os.path.basename(file_path) + '_'
-        self.temp_dir = tempfile.TemporaryDirectory(prefix=dir_prefix)
+        self.temp_dir_obj = tempfile.TemporaryDirectory(prefix=dir_prefix)
+        self.temp_dir = self.temp_dir_obj.name
 
         logger.info('======')
         logger.info(f'Parser {self.__class__.__name__} initialized: {file_path}')
@@ -108,4 +109,4 @@ class BasicParser:
         return self.add_tag(content,'section', f'{self.knowledge_path}: {section_path_in_file}')
     
     def __del__(self):
-        self.temp_dir.cleanup()
+        self.temp_dir_obj.cleanup()

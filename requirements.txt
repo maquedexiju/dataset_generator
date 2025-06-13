@@ -1,9 +1,10 @@
 Pillow
 requests
 openai
-pywin32; sys_platform == 'win32'
+comtypes; sys_platform == 'win32'
 python-docx
 pymupdf
+pandas
 # layoutparser # Install the base layoutparser library with  
 # layoutparser[paddledetection] # Install DL layout model toolkit 
 # layoutparser[ocr] # Install OCR toolkit

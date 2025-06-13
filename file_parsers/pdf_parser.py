@@ -272,6 +272,9 @@ class PDFParser(BasicParser):
     
     def _correct_heading_level(self, headings):
         # 遍历 headings，获取所有的 heading
+
+        if headings == [] and self.toc == []: return []
+
         doc_toc = []
         for level, content, _ in self.toc:
             doc_toc.append({'content': content, 'level': level})
@@ -625,7 +628,11 @@ class PDFParser(BasicParser):
         if pdf_type == 'doc' or 'ppt':
             former_content = ''
             for pg in self.pdf_doc:
-                img_pil = pg.get_pixmap(matrix=fitz.Matrix(2, 2)).pil_image()
+                try:
+                    img_pil = pg.get_pixmap(matrix=fitz.Matrix(2, 2)).pil_image()
+                except Exception as e:
+                    pixmap = pg.get_pixmap()
+                    img_pil = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
                 retried = 0
                 # former_content = self.parse_doc_page(img_pil, pg.number+1, former_content)
                 while True:
