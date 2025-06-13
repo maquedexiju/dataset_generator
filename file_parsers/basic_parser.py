@@ -11,7 +11,7 @@ class BasicParser:
         :param file_path: 完整的文件路径
         :param root_path: 根目录路径
         :param cfg: 配置内容
-        :param title_prefix: 可用替代字符：%parent 所有目录，%parent_n 至多几级目录，%file 文件名
+        :param title_prefix: 可用替代字符：%root 根目录；%parent 所有目录（不包含根目录），%parent_n 至多几级目录，%file 文件名
         '''
 
         # 检查文件路径是否存在
@@ -46,6 +46,11 @@ class BasicParser:
             title_prefix = title_prefix.replace('%parent', parent)
         
         self.title_prefix = title_prefix
+
+
+        if '%root' in title_prefix:
+            root_name = os.path.basename(root_path)
+            title_prefix = title_prefix.replace('%root', root_name)
 
         self.cfg = cfg
 
@@ -82,7 +87,7 @@ class BasicParser:
         :return:
         '''
 
-        return f'\n@{tag_name}: {self.knowledge_path}: {tag_desc}\n\n{content}\n@end{tag_name}\n'
+        return f'\n@{tag_name}: {tag_desc}\n\n{content}\n@end{tag_name}\n'
     
 
     def add_resource_tag(self, content, resource_path_in_file):

@@ -19,7 +19,7 @@ class MDParser(BasicParser):
     # reg = r'(?:.*\.md|.*\.markdown)$'
     suffix = ['md', 'markdown']
 
-    def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None):
+    def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None, output_dir=''):
         # 检查文件类型
         if not file_path.lower().endswith('.md') and not file_path.lower().endswith('.markdown'):
             raise ValueError("file type error, not a markdown file")
@@ -30,7 +30,7 @@ class MDParser(BasicParser):
         self.img_parse_model = cfg['IMG_RECONGNIZE_MODEL']['model_name']
         self.openai_client = OpenAI(api_key=self.img_parse_key, base_url=self.img_parse_url)
 
-        super().__init__(file_path, root_path, cfg, title_prefix, logger)
+        super().__init__(file_path, root_path, cfg, title_prefix, logger, output_dir)
 
 
     def get_image_description(self, img_path):
@@ -117,8 +117,10 @@ class MDParser(BasicParser):
 
             # 获取图片描述
             description = self.get_image_description(img_saved)
-            position = f'{self.knowledge_path}: {os.path.basename(img_saved)}'
-            description = self.add_tag(description, 'resource', position)
+            # position = f'{self.knowledge_path}: {os.path.basename(img_saved)}'
+            position = os.path.basename(img_saved)
+            # description = self.add_tag(description, 'resource', position)
+            description = self.add_resource_tag(description, position)
             # description = f'\n@resource: {position}\n\n' + description + '\n@endresource\n'
 
             # 替换
@@ -138,12 +140,11 @@ class MDParser(BasicParser):
         # 若 md 开头不是一级标题，添加一级标题为文件名
         if not self.md_content.startswith('#'):
             self.md_content = f'# {self.file_basename}\n\n' + self.md_content
-        
-        # 如果 md 中含有多个一级标题，那么 self.title_prefix 保留文件名
-        if self.md_content.count('\n# ') > 1:
-            if self.file_basename not in self.title_prefix:
-                self.title_prefix += '-' + self.file_basename
 
+        # # 如果 md 中含有多个一级标题，那么 self.title_prefix 保留文件名
+        # if self.md_content.count('\n# ') > 1:
+        #     if self.file_basename not in self.title_prefix:
+        #         self.title_prefix += '-' + self.file_basename
 
         result = {}
         headers = []
@@ -193,7 +194,11 @@ class MDParser(BasicParser):
                     headers = headers[:level - 1]
                     headers.append(header_text)
 
-                current_header_path = '-'.join([self.title_prefix] + headers)
+                # current_header_path = '-'.join([self.title_prefix] + headers)
+                if self.title_prefix == '':
+                    current_header_path = '-'.join(headers)
+                else:
+                    current_header_path = '-'.join([self.title_prefix] + headers)
             else:
                 # 处理 md 语法的图片
                 line = self.handle_img_reg(r'!\[.*\]\(.*\)', r'!\[.*\]\((.*)\)', line)
@@ -206,6 +211,9 @@ class MDParser(BasicParser):
         if current_header_path and current_content:
             position = "-".join(headers)
             result[current_header_path] = self.add_section_tag('\n'.join(current_content).strip(), position)
+        elif current_content:
+            position = self.file_basename
+            result[self.file_basename] = self.add_section_tag('\n'.join(current_content).strip(), position)
 
         self.content_dict = result
         

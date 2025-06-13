@@ -166,7 +166,7 @@ determine_heading_level_prompt = '''
 
 ## 调整规则
 
-1. 对于连续重复的标题，保留第一个，并设置其他重复标题的级别为 0
+1. 对于页眉、页脚识别错误添加的错误标题，设置级别为 0
 2. 优先参考文档目录名称，调整标题的级别，级别从 1 开始，1 表示一级标题，2 表示二级标题，以此类推
 3. 如果文档目录名称为空，则按照标题的内容进行调整
 4. 不要调整标题的内容、id和列表的顺序
@@ -184,7 +184,7 @@ determine_heading_level_prompt = '''
 
 class PDFParser(BasicParser):
     suffix = 'pdf'
-    def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None):
+    def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None, output_dir=''):
         # 检查文件类型
         if not file_path.lower().endswith('.pdf'):
             raise ValueError("file type error, not a pdf file")
@@ -201,7 +201,7 @@ class PDFParser(BasicParser):
         self.llm_model = cfg['LLM']['model_name']
         self.llm_client = OpenAI(api_key=self.llm_key, base_url=self.llm_url)
 
-        super().__init__(file_path, root_path, cfg, title_prefix, logger)
+        super().__init__(file_path, root_path, cfg, title_prefix, logger, output_dir)
 
         self.pdf_doc = fitz.open(self.file_path)
         self.toc = self.pdf_doc.get_toc()
@@ -214,20 +214,20 @@ class PDFParser(BasicParser):
                 self.page_sizes[r] = 0
             self.page_sizes[r] += 1
         
-        # # 创建 chart_output_dir
-        # self.chart_output_dir = os.path.join(self.output_dir, 'chart')
-        # if not os.path.exists(self.chart_output_dir):
-        #     os.makedirs(self.chart_output_dir)
+        # 创建 chart_output_dir
+        self.chart_output_dir = os.path.join(self.output_dir, 'chart')
+        if not os.path.exists(self.chart_output_dir):
+            os.makedirs(self.chart_output_dir)
 
-        # # 创建 table_output_dir
-        # self.table_output_dir = os.path.join(self.output_dir, 'table')
-        # if not os.path.exists(self.table_output_dir):
-        #     os.makedirs(self.table_output_dir)
+        # 创建 table_output_dir
+        self.table_output_dir = os.path.join(self.output_dir, 'table')
+        if not os.path.exists(self.table_output_dir):
+            os.makedirs(self.table_output_dir)
 
-        # 创建 img_output_dir
-        self.img_output_dir = os.path.join(self.output_dir, 'img')
-        if not os.path.exists(self.img_output_dir):
-            os.makedirs(self.img_output_dir)
+        # # 创建 img_output_dir
+        # self.img_output_dir = os.path.join(self.output_dir, 'img')
+        # if not os.path.exists(self.img_output_dir):
+        #     os.makedirs(self.img_output_dir)
 
     
     def __bbox_dict_to_list(self, bbox_dict):
@@ -297,7 +297,7 @@ class PDFParser(BasicParser):
         result_str = response.choices[0].message.content
         # with open('PDFParser_correct_heading_level_response.json', 'r') as f:
         #     result_str = f.read()
-        if self.cfg['LOG']['log_level'] in ['DEBUG', 'INFO']:
+        if self.cfg['LOG']['log_level'] in ['DEBUG']:
             with open('PDFParser_correct_heading_level_response.json', 'w', encoding='utf-8') as f:
                     f.write(result_str)
         try:
@@ -381,29 +381,29 @@ class PDFParser(BasicParser):
 
         # 发起请求
         prompt = doc_pdf_parse_prompt.replace( '{former_content}', former_content)
-        # try:
-        #     response = self.openai_client.chat.completions.create(
-        #         model=self.img_parse_model,
-        #         messages=[
-        #             {"role": "system", "content": prompt},
-        #             {"role": "user", "content": [
-        #                 {
-        #                     "type": "image_url",
-        #                     "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}
-        #                 }
-        #             ]}
-        #         ]
-        #     )
-        # except Exception as e:
-        #     self.logger.error(f'调用 OpenAI API 失败，错误信息：{e}')
-        #     raise ValueError(f'调用 OpenAI API 失败，错误信息：{e}')
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=self.img_parse_model,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}
+                        }
+                    ]}
+                ]
+            )
+        except Exception as e:
+            self.logger.error(f'调用 OpenAI API 失败，错误信息：{e}')
+            raise ValueError(f'调用 OpenAI API 失败，错误信息：{e}')
 
-        # result_str = response.choices[0].message.content
-        with open(f'PDFParser_parse_doc_page_response_{page_number}.json', 'r', encoding='utf-8') as f:
-            result_str = f.read()
+        result_str = response.choices[0].message.content
+        # with open(f'PDFParser_parse_doc_page_response_{page_number}.json', 'r', encoding='utf-8') as f:
+        #     result_str = f.read()
         result_str = self._correct_latex_formula(result_str)
 
-        if self.cfg['LOG']['log_level'] in ['DEBUG', 'INFO']:
+        if self.cfg['LOG']['log_level'] in ['DEBUG']:
             with open(f'PDFParser_parse_doc_page_response_{page_number}.json', 'w', encoding='utf-8') as f:
                     f.write(result_str)
 
@@ -418,9 +418,7 @@ class PDFParser(BasicParser):
         result = self._corrent_bbox(result, pg_pil_img)
 
         self.doc_content.append(result)
-
         last_useful_block = [x for x in result['blocks'] if x['type'] not in ['页眉', '页脚', '脚注']][-1]
-        return last_useful_block['content']
 
         
         # 处理图表
@@ -434,7 +432,8 @@ class PDFParser(BasicParser):
             former_info = f'@resource: {blk["id"]}'
             img_name = f'page_{page_number}_chart_{blk["id"]}.jpg'
             new_info = f'@resource: {self.knowledge_path}: {img_name}'
-            result['full_text'] = result['full_text'].replace(former_info, new_info)
+            blk['content'] = blk['content'].replace(former_info, new_info)
+            # result['full_text'] = result['full_text'].replace(former_info, new_info)
         
         # 处理表格
         for blk in [x for x in result['blocks'] if x['type'] == '表格']:
@@ -445,6 +444,8 @@ class PDFParser(BasicParser):
             img = pg_pil_img.crop(blk['bbox'])
             img_path = os.path.join(self.table_output_dir, f'page_{page_number}_table_{blk["id"]}.jpg')
             img.save(img_path)
+
+        return last_useful_block['content']
 
         # # 处理页面，保存下来
         # img_list = [x for x in result['blocks'] if x['type'] == '图表']
@@ -599,7 +600,11 @@ class PDFParser(BasicParser):
                     headers = headers[:level - 1]
                     headers.append(header_text)
 
-                current_header_path = '-'.join([self.title_prefix] + headers)
+                # current_header_path = '-'.join([self.title_prefix] + headers)
+                if self.title_prefix == '':
+                    current_header_path = '-'.join(headers)
+                else:
+                    current_header_path = '-'.join([self.title_prefix] + headers)
             else:
                 current_content.append(line)
 
@@ -607,6 +612,9 @@ class PDFParser(BasicParser):
         if current_header_path and current_content:
             position = "-".join(headers)
             result[current_header_path] = self.add_section_tag('\n'.join(current_content).strip(), position)
+        elif current_content:
+            position = self.file_basename
+            result[self.file_basename] = self.add_section_tag('\n'.join(current_content).strip(), position)
 
         self.content_dict = result
 
@@ -614,14 +622,13 @@ class PDFParser(BasicParser):
     def parse(self):
         # 实现具体的解析逻辑
         pdf_type, is_img = self.judge_pdf_type()
-        if pdf_type == 'doc':
+        if pdf_type == 'doc' or 'ppt':
             former_content = ''
             for pg in self.pdf_doc:
-                if pg.number > 2: break
                 img_pil = pg.get_pixmap(matrix=fitz.Matrix(2, 2)).pil_image()
                 retried = 0
-                former_content = self.parse_doc_page(img_pil, pg.number+1, former_content)
-                while False:
+                # former_content = self.parse_doc_page(img_pil, pg.number+1, former_content)
+                while True:
                     try:
                         former_content = self.parse_doc_page(img_pil, pg.number+1, former_content)
                         self.logger.debug(f'{pg.number+1} 已分析')

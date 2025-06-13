@@ -1,7 +1,8 @@
 import os, sys
 from configparser import ConfigParser
-from tools import file_manage, qa_manage
+from tools import parser_manage, qa_manage, info_maintenance
 import logging
+import argparse
 
 config = ConfigParser(interpolation=None)
 config.read('config.ini')
@@ -47,39 +48,70 @@ if sys.platform.startswith('darwin'):
 
 if __name__ == '__main__':
 
-    args = sys.argv
-    if len(args) == 1:
-        print('请输入要解析的文件路径')
+    # 对 argv 进行解析
+    parser = argparse.ArgumentParser(description='解析文档')
+    parser.add_argument('filename', type=str, nargs='?', help='要解析的文档根目录', default=None)
+    parser.add_argument('-i', '--input', type=str, help='要解析的文档根目录')
+    # parser.add_argument('--input', type=str, help='要解析的文档根目录')
+    parser.add_argument('-o', '--output', type=str, help='输出位置', default=os.path.join('.', 'output'))
+    # parser.add_argument('-o', type=str, help='输出位置', default=os.path.join('.', 'output'))
+    # parser.add_argument('-h', '--help', action='help', help='显示帮助信息')
+
+
+    args = parser.parse_args(sys.argv[1:])
+
+    if args.input:
+        docs_root_dir = args.input
+    elif args.filename:
+        docs_root_dir = args.filename
+    else:
+        print('请指定要解析的文档根目录')
         exit(1)
-    elif len(args) >= 2:
-        root_dir = ' '.join(args[1:])
 
-    if not os.path.exists(root_dir):
-        print(f'文件路径不存在: {root_dir}')
+    if not os.path.exists(docs_root_dir):
+        print(f'文件路径不存在: {docs_root_dir}')
         exit(1)
-    
-    parent_path, file_name = os.path.split(root_dir)
-    knowledge_base_dir = os.path.join(parent_path, f'{file_name}_kb')
-    if not os.path.exists(knowledge_base_dir):
-        os.makedirs(knowledge_base_dir)
+
+    docs_root_name = os.path.basename(docs_root_dir)
+    output_dir = args.output
+    output_docs_dir = os.path.join(args.output, docs_root_name)
+    # parent_path, file_name = os.path.split(docs_root_dir)
+    # output_docs_dir = os.path.join(parent_path, f'{file_name}_kb')
+    # if not os.path.exists(output_docs_dir):
+    #     os.makedirs(output_docs_dir)
+    # output_docs_dir = os.path.join('.', 'output', docs_root_dir)
+    if not os.path.exists(output_docs_dir):
+        os.makedirs(output_docs_dir)
 
 
-    parser_chooser = file_manage.Parser_Chooser(config_dict, logger)
-    qa_manager = qa_manage.QA_Manager(config_dict, root_dir)
+    parser_chooser = parser_manage.Parser_Chooser(config_dict, logger)
+    qa_manager = qa_manage.QA_Manager(config_dict, docs_root_dir, output_dir)
+    info_maintenance = info_maintenance.InfoMaintenancer(docs_root_dir, output_dir, config_dict, logger)
 
-    for dir, children, files in os.walk(root_dir):
+    for dir, children, files in os.walk(docs_root_dir):
         for file in files:
             file_path = os.path.join(dir, file)
             parser_class = parser_chooser.choose_parser(file_path)
             if parser_class == 'ignored':
                 logger.info('======')
-                logger.info(f'file {file_path} ignored')
+                logger.info(f'跳过 {file_path}')
             elif parser_class is not None:
-                parser = parser_class(file_path, root_dir, config_dict, title_prefix='%parent', logger=logger, output_dir=knowledge_base_dir)
-                result = parser.parse()
-                qa_manager.merge_qa(result, file_path)
+
+                is_new = info_maintenance.is_new(file_path)
+                if is_new:
+                    try:
+                        parser = parser_class(file_path, docs_root_dir, config_dict, title_prefix='%parent', logger=logger, output_dir=output_docs_dir)
+                        result = parser.parse()
+                        qa_manager.merge_qa(result, file_path)
+                        info_maintenance.updated(file_path)
+                    except Exception as e:
+                        raise(e)
+
+                else:
+                    logger.info('======')
+                    logger.info(f'{file_path} 无更新，跳过')
             else:
                 logger.warning('======')
-                logger.warning(f'no parser for {file_path}')
+                logger.warning(f'{file_path} 无法解析')
     
-    qa_manager.export_csv('qa.csv')
+    # qa_manager.export_csv('qa.csv')

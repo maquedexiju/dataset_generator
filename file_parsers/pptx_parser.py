@@ -66,7 +66,7 @@ class PPTXParserViaPDF(BasicParser):
 
     suffix = 'pptx'
 
-    def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None):
+    def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None, output_dir=''):
         # 检查文件类型
         if not file_path.lower().endswith('.pptx'):
             raise ValueError("file type error, not a pptx file")
@@ -77,7 +77,7 @@ class PPTXParserViaPDF(BasicParser):
         self.img_parse_model = cfg['IMG_RECONGNIZE_MODEL']['model_name']
         self.openai_client = OpenAI(api_key=self.img_parse_key, base_url=self.img_parse_url)
 
-        super().__init__(file_path, root_path, cfg, title_prefix, logger)
+        super().__init__(file_path, root_path, cfg, title_prefix, logger, output_dir)
 
     
     def ppt_to_pdf(self, pdf_file_path, tmp_dir):

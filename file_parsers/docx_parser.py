@@ -20,7 +20,7 @@ class DOCXParser(BasicParser):
 
     suffix = 'docx'
 
-    def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None):
+    def __init__(self, file_path, root_path, cfg={}, title_prefix='%parent', logger=None, output_dir=''):
         # 检查文件类型
         if not file_path.lower().endswith('.docx'):
             raise ValueError("file type error, not a docx file")
@@ -31,7 +31,7 @@ class DOCXParser(BasicParser):
         self.img_parse_model = cfg['IMG_RECONGNIZE_MODEL']['model_name']
         self.openai_client = OpenAI(api_key=self.img_parse_key, base_url=self.img_parse_url)
 
-        super().__init__(file_path, root_path, cfg, title_prefix, logger)
+        super().__init__(file_path, root_path, cfg, title_prefix, logger, output_dir)
 
         # 检查是否是临时文件
         file_fullname = os.path.basename(file_path)
@@ -257,7 +257,11 @@ class DOCXParser(BasicParser):
                     headers = headers[:level - 1]
                     headers.append(header_text)
 
-                current_header_path = '-'.join([self.title_prefix] + headers)
+                # current_header_path = '-'.join([self.title_prefix] + headers)
+                if self.title_prefix == '':
+                    current_header_path = '-'.join(headers)
+                else:
+                    current_header_path = '-'.join([self.title_prefix] + headers)
             else:
                 current_content.append(line)
 
@@ -265,6 +269,9 @@ class DOCXParser(BasicParser):
         if current_header_path and current_content:
             position = f'{self.knowledge_path}: {"-".join(headers)}'
             result[current_header_path] = f'\n@section: {position}\n\n' + '\n'.join(current_content).strip() + '\n@endsection\n'
+        elif current_content:
+            position = self.file_basename
+            result[self.file_basename] = self.add_section_tag('\n'.join(current_content).strip(), position)
 
         self.content_dict = result
 

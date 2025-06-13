@@ -3,41 +3,6 @@ import importlib
 from file_parsers.basic_parser import BasicParser
 import re
 
-def gen_doc_tree(dir_path):
-    """
-    生成目录树
-    """
-    root_name = dir_path.split('/')[-1]
-    root_path = dir_path.split(root_name)[0]
-    tree = {
-        root_name: {
-            'dir_path': dir_path, 'children': {}, 'files': {}
-        }
-    }
-    sep = os.path.sep
-
-    for root, dirs, files in os.walk(dir_path):
-        # root 去掉 root_path
-        root = root.replace(root_path, '')
-
-        cur_node = tree[root_name]
-        for p in root.split(sep)[1:]:
-            cur_node = cur_node['children'][p]
-
-        # 把 dirs 转为 dict
-        for d in dirs:
-            cur_node['children'][d] = {
-                'dir_path': os.path.join(dir_path, root, d), 'children': {}, 'files': {}
-            }
-        
-        # 把 files 转为 dict
-        for f in files:
-            cur_node['files'][f] = {
-                'dir_path': os.path.join(dir_path, root, f)
-            }
-    
-    return tree
-
 
 class Parser_Chooser:
 
@@ -71,8 +36,8 @@ class Parser_Chooser:
                                         self.logger.warning(f'后缀 {r} 已有处理器 {self.parser['suffix'][r].__name__}， {obj.__name__} 会被忽略')
                                     else:
                                         self.parser['suffix'][r] = obj
-                        if hasattr(obj,'suffix'):
-                            self.parser['suffix'][obj.suffix] = obj
+                        if hasattr(obj,'reg'):
+                            self.parser['reg'][obj.reg] = obj
         
         self.path_ignore = self.read_path_ignore(config['GENERAL']['path_ignore'])
 
